@@ -63,7 +63,7 @@ async function handleMessage(channel: string, user: string, text: string) {
   status.lastVoteAt = Date.now();
 
   status.vote = _.mean([...status.votes.values()]);
-  status.vote = Math.trunc(status.vote) + (status.vote >= 0.5 ? 0.5 : 0);
+  status.vote = Math.trunc(status.vote) + (status.vote % 1 >= 0.5 ? 0.5 : 0);
 
   console.log(`${user} voted ${vote} on ${channel}'s channel!`);
 
@@ -120,7 +120,10 @@ io.on('connection', (socket) => {
   });
   status.sockets.set(socket.id, socket);
 
-  if (!status.vote) {
+  if (!status.vote || !status.lastVoteAt) {
+    return;
+  }
+  if (Date.now() - status.lastVoteAt >= Number(process.env.VOTE_TTL)) {
     return;
   }
 
