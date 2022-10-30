@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Twitch QuickVote: {{channel}}</title>
+  <style>
+    [v-cloak] {
+      display: none;
+    }
+
+    body {
+      background-color: black;
+    }
+
+    #vote {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: #ffffff;
+    }
+
+    .v-enter-active,
+    .v-leave-active {
+      transition: opacity 0.5s ease;
+    }
+
+    .v-enter-from,
+    .v-leave-to {
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div id="app" v-cloak>
+    <Transition>
+      <h1 id="vote" v-if="voteShown">Voto chat: [[ vote ]] / 10</h1>
+    </Transition>
+  </div>
+</main>
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="{{&basePath}}/socket.io/socket.io.js"></script>
+<script>
+  const vote = Vue.ref(0);
+  const voteShown = Vue.ref(false);
+
+  let hideTimer;
+
+  const app = Vue.createApp({
+    compilerOptions: {
+      delimiters: ['[[', ']]'],
+    },
+    data() {
+      return {
+        vote: vote,
+        voteShown: voteShown,
+      }
+    },
+  });
+  app.mount('#app');
+
+  const socket = io({
+    path: '{{&basePath}}/socket.io/',
+    query: {
+      channel: '{{&channel}}',
+    }
+  });
+  socket.on('vote_update', (update) => {
+    console.log(`Vote update: ${JSON.stringify(update)}`);
+    if (update.vote == null) {
+      voteShown.value = false;
+      if (hideTimer) {
+        clearTimeout(hideTimer);
+      }
+      return;
+    }
+    vote.value = update.vote;
+    if (hideTimer) {
+      clearTimeout(hideTimer);
+    }
+    if (!voteShown.value) {
+      voteShown.value = true;
+    }
+    hideTimer = setTimeout(() => {
+      voteShown.value = false;
+    }, {{voteTtl}});
+  });
+  socket.on('connect', () => {
+    console.log('Socket: connected!');
+  });
+  socket.on('connect_error', (err) => {
+    console.error('A socket connection error occurred: ' + err);
+  });
+  socket.on('error', (err) => {
+    console.error('An error occurred: ' + err);
+  });
+</script>
+</body>
+</html>
