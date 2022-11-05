@@ -9,7 +9,7 @@ import mustacheExpress from "mustache-express";
 
 dotenv.config();
 
-const VOTE_MATCHER_REGEX = /(^| )(?<vote>[1-9]0?([.,]5)?) *\/ *10\b/;
+const VOTE_MATCHER_REGEX = /(^| )(?<vote>[1-9]0?(([.,](5|25))|([-+])?)) *\/ *10\b/;
 
 const channelStatusManager = new ChannelStatusManager();
 
@@ -26,6 +26,10 @@ const chatClient = new ChatClient({
   channels: channels,
 });
 await chatClient.connect();
+if (!chatClient.isConnected) {
+  console.error('Unable to join chat, exit');
+  process.exit(1);
+}
 
 async function resetVote(user: string, channel: string) {
   const status = channelStatusManager.getStatus(channel);
@@ -54,8 +58,16 @@ async function handleMessage(channel: string, user: string, text: string) {
     return;
   }
 
+  let mod = 0;
+  if (voteString.endsWith('-')) {
+    mod = -0.25;
+    voteString = voteString.slice(0, -1);
+  } else if (voteString.endsWith('+')) {
+    mod = 0.25;
+    voteString = voteString.slice(0, -1);
+  }
   voteString = voteString.replace(/,/g, '.');
-  const vote = Number(voteString);
+  const vote = Math.max(1, Math.min(10, Number(voteString) + mod));
 
   const status = channelStatusManager.getOrCreateStatus(channel);
 
@@ -63,7 +75,7 @@ async function handleMessage(channel: string, user: string, text: string) {
   status.lastVoteAt = Date.now();
 
   status.vote = _.mean([...status.votes.values()]);
-  status.vote = Math.trunc(status.vote) + (status.vote % 1 >= 0.5 ? 0.5 : 0);
+  status.vote = Math.round(status.vote * 4)/4;
 
   console.log(`${user} voted ${vote} on ${channel}'s channel!`);
 
